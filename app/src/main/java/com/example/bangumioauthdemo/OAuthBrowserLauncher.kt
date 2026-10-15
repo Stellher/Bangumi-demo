@@ -8,6 +8,7 @@ import android.net.Uri
 import androidx.browser.customtabs.CustomTabColorSchemeParams
 import androidx.browser.customtabs.CustomTabsIntent
 import java.net.URI
+import java.net.URLDecoder
 
 /**
  * Launches Bangumi's official consent UI via Android's installed browser,
@@ -25,13 +26,27 @@ object OAuthBrowserLauncher {
      */
     fun isOfficialAuthorizationUrl(raw: String): Boolean = try {
         val uri = URI(raw)
-        uri.scheme.equals("https", ignoreCase = true) &&
+        val baseMatches = uri.scheme.equals("https", ignoreCase = true) &&
             uri.host.equals("bgm.tv", ignoreCase = true) &&
             (uri.port == -1 || uri.port == 443) &&
             uri.rawUserInfo == null &&
             uri.rawFragment == null &&
-            uri.path == "/oauth/authorize" &&
-            uri.rawQuery != null
+            uri.path == "/oauth/authorize"
+        val pairs = uri.rawQuery.orEmpty().split("&")
+            .filter(String::isNotBlank)
+            .map { pair ->
+                val index = pair.indexOf("=")
+                require(index > 0)
+                val name = URLDecoder.decode(pair.substring(0, index), "UTF-8")
+                val value = URLDecoder.decode(pair.substring(index + 1), "UTF-8")
+                name to value
+            }
+        val params = pairs.toMap()
+        baseMatches && pairs.size == params.size &&
+            params["client_id"] == BuildConfig.BGM_CLIENT_ID &&
+            params["response_type"] == "code" &&
+            params["redirect_uri"] == OAuthRepository.REDIRECT &&
+            !params["state"].isNullOrBlank()
     } catch (_: Exception) {
         false
     }
