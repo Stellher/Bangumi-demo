@@ -10,8 +10,8 @@ android {
         applicationId = "com.example.bangumioauthdemo"
         minSdk = 26
         targetSdk = 35
-        versionCode = 7
-        versionName = "2.2.0"
+        versionCode = 8
+        versionName = "2.2.1"
         buildConfigField("String", "BGM_CLIENT_ID", "\"bgm72976ace318d39b25\"")
     }
     buildFeatures { compose = true; buildConfig = true }
@@ -37,6 +37,7 @@ dependencies {
     implementation("androidx.compose.material3:material3")
     implementation("androidx.compose.material:material-icons-extended")
     implementation("androidx.activity:activity-compose:1.11.0")
+    implementation("androidx.browser:browser:1.10.0")
     implementation("androidx.lifecycle:lifecycle-viewmodel-compose:2.9.0")
     implementation("androidx.lifecycle:lifecycle-runtime-compose:2.9.0")
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.10.2")

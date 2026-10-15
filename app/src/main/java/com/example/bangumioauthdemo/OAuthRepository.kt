@@ -4,6 +4,7 @@ import android.net.Uri
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import okhttp3.FormBody
+import okhttp3.CookieJar
 import okhttp3.OkHttpClient
 import okhttp3.Request
 import org.json.JSONObject
@@ -53,6 +54,40 @@ object OAuthRepository {
                 JSONObject(body)
             }
         }
+
+    /**
+     * Unauthenticated, read-only HTTP probe of the first OAuth redirect.
+     * This is NOT browser traffic sniffing and cannot capture a signed-in
+     * session: browser cookies/passwords deliberately remain isolated.
+     *
+     * Reports only HTTP status, content type and the next redirect host/path.
+     * Never returns Set-Cookie, a query string, a password or an OAuth code.
+     */
+    suspend fun probeAuthorizationEntry(): JSONObject = withContext(Dispatchers.IO) {
+        val probe = http.newBuilder()
+            .followRedirects(false)
+            .followSslRedirects(false)
+            .cookieJar(CookieJar.NO_COOKIES)
+            .build()
+        val target = authorizeUrl("diagnostic-" + java.util.UUID.randomUUID())
+        val request = Request.Builder()
+            .url(target)
+            .get()
+            .header("User-Agent", "BangumiGlass/2.2 (Android; OAuth diagnostic)")
+            .build()
+        probe.newCall(request).execute().use { response ->
+            val next = response.header("Location")?.let { request.url.resolve(it) }
+            JSONObject()
+                .put("endpoint", "GET https://bgm.tv/oauth/authorize")
+                .put("http_status", response.code)
+                .put("content_type", response.header("Content-Type").orEmpty().substringBefore(";"))
+                .put("redirect_host", next?.host.orEmpty())
+                .put("redirect_path", next?.encodedPath.orEmpty())
+                .put("cookies_sent", false)
+                .put("redirects_followed", false)
+                .put("note", "仅查看未登录时的公开 HTTP 跳转，完整账号登录及授权需通过系统浏览器。")
+        }
+    }
 
     suspend fun exchange(code: String, secret: String): JSONObject = post(mapOf(
         "grant_type" to "authorization_code",

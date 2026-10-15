@@ -38,7 +38,7 @@ class MainActivity : ComponentActivity() {
         if (OAuthSessionManager.session.value != null) RefreshScheduler.schedule(application)
         setContent {
             MaterialTheme {
-                AppShell(oauth, explorer, ::openUrl)
+                AppShell(oauth, explorer, ::openAuth, ::openUrl)
             }
         }
         oauth.callback(intent?.data)
@@ -57,6 +57,14 @@ class MainActivity : ComponentActivity() {
         oauth.callback(intent.data)
     }
 
+    private fun openAuth(url: String) {
+        try {
+            OAuthBrowserLauncher.launch(this, url)
+        } catch (e: Exception) {
+            oauth.browserLaunchFailed(e.message ?: "打开系统授权窗口失败")
+        }
+    }
+
     private fun openUrl(url: String) {
         startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(url)))
     }
@@ -66,6 +74,7 @@ class MainActivity : ComponentActivity() {
 private fun AppShell(
     oauth: OAuthViewModel,
     explorer: ApiExplorerViewModel,
+    openAuth: (String) -> Unit,
     openUrl: (String) -> Unit
 ) {
     var page by remember { mutableIntStateOf(0) }
@@ -97,7 +106,7 @@ private fun AppShell(
     ) { padding ->
         Box(Modifier.fillMaxSize().padding(padding)) {
             when (page) {
-                0 -> OAuthScreen(oauth, openUrl)
+                0 -> OAuthScreen(oauth, openAuth, openUrl)
                 1 -> ApiScreen(explorer, session?.accessToken, { page = 0 })
                 else -> HistoryScreen(explorer)
             }
@@ -117,7 +126,11 @@ private fun PageHeadline(title: String, subtitle: String) {
 }
 
 @Composable
-private fun OAuthScreen(vm: OAuthViewModel, openUrl: (String) -> Unit) {
+private fun OAuthScreen(
+    vm: OAuthViewModel,
+    openAuth: (String) -> Unit,
+    openUrl: (String) -> Unit
+) {
     val secret by vm.clientSecret.collectAsStateWithLifecycle()
     val output by vm.output.collectAsStateWithLifecycle()
     val session by vm.session.collectAsStateWithLifecycle()
@@ -147,10 +160,26 @@ private fun OAuthScreen(vm: OAuthViewModel, openUrl: (String) -> Unit) {
             visualTransformation = PasswordVisualTransformation()
         )
         Button(
-            onClick = { openUrl(vm.beginLogin()) },
+            onClick = { openAuth(vm.beginLogin()) },
             enabled = !busy && secret.isNotBlank(),
             modifier = Modifier.fillMaxWidth()
-        ) { Text("通过 Bangumi 官方网页登录授权") }
+        ) { Text("通过系统安全授权窗口登录 Bangumi") }
+        Text(
+            "本应用不使用 WebView，也不会获取你的 Bangumi 账号密码。登录与授权确认由系统浏览器安全处理；" +
+                "返回授权码后，App 使用 OkHttp 完成 Token 交换与自动续期。",
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant
+        )
+        OutlinedButton(
+            onClick = vm::inspectAuthorizationEntry,
+            enabled = !busy,
+            modifier = Modifier.fillMaxWidth()
+        ) { Text("用 OkHttp 检查授权入口 HTTP 跳转（无账号凭据）") }
+        Text(
+            "这只检测未登录请求的 HTTP 状态与重定向路径，不抓取系统浏览器的登录 Cookie、密码或验证码。",
+            style = MaterialTheme.typography.labelSmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant
+        )
         if (session != null) {
             val current = session!!
             HorizontalDivider()
