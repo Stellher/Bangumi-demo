@@ -9,6 +9,7 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 import org.json.JSONObject
 import java.security.SecureRandom
+import java.security.MessageDigest
 
 class OAuthViewModel(private val app: Application) : AndroidViewModel(app) {
     private val prefs = app.getSharedPreferences("oauth_demo", 0)
@@ -47,36 +48,63 @@ class OAuthViewModel(private val app: Application) : AndroidViewModel(app) {
         val state = bytes.joinToString("") { "%02x".format(it) }
         pendingState = state
         prefs.edit().putString("pending_state", state).apply()
-        _output.value = "正在等待 Bangumi 浏览器授权回调…"
+        _output.value = "已启动 Android 系统安全授权窗口，等待 Bangumi 官方授权回调。"
         return OAuthRepository.authorizeUrl(state)
     }
 
-    fun callback(uri: Uri?) {
-        if (uri?.scheme != "bgmoauthdemo" || uri.host != "callback") return
-        val error = uri.getQueryParameter("error")
-        if (error != null) {
-            pendingState = null
-            prefs.edit().remove("pending_state").apply()
-            _output.value = "授权失败：" + error
-            return
-        }
-        val state = uri.getQueryParameter("state")
-        if (pendingState == null || state != pendingState) {
-            _output.value = "拒绝授权回调：state 不匹配，请重新登录。"
-            return
-        }
-        val code = uri.getQueryParameter("code")
-        if (code.isNullOrBlank()) {
-            _output.value = "回调中没有 authorization code。"
-            return
-        }
+    /** Called when this device has no eligible HTTPS browser installed. */
+    fun browserLaunchFailed(message: String) {
         pendingState = null
         prefs.edit().remove("pending_state").apply()
-        _output.value = "Authorization Code:\n" + code + "\n\n正在交换 Access Token…"
+        _output.value = "无法打开系统授权窗口：" + message.take(180)
+    }
+
+    fun callback(uri: Uri?) {
+        if (uri?.scheme != "bgmoauthdemo" || uri.host != "callback" ||
+            uri.port != -1 || !uri.path.isNullOrEmpty()
+        ) return
+
+        // Reject forged callbacks and duplicate query parameters before any
+        // error handling, and never send an authorization code to logs or UI.
+        val suppliedStates = uri.getQueryParameters("state")
+        val expected = pendingState
+        val matches = expected != null && suppliedStates.size == 1 &&
+            MessageDigest.isEqual(
+                expected.toByteArray(Charsets.UTF_8),
+                suppliedStates.single().toByteArray(Charsets.UTF_8)
+            )
+        if (!matches) {
+            _output.value = "拒绝授权回调：state 无效，请重新发起登录。"
+            return
+        }
+        val oauthError = uri.getQueryParameter("error")
+        if (oauthError != null) {
+            pendingState = null
+            prefs.edit().remove("pending_state").apply()
+            _output.value = "Bangumi 未完成授权：" + oauthError.take(80)
+            return
+        }
+        val codes = uri.getQueryParameters("code")
+        if (codes.size != 1 || codes.single().isBlank()) {
+            _output.value = "回调缺少有效授权码，请重新登录。"
+            return
+        }
+        val code = codes.single()
+        pendingState = null
+        prefs.edit().remove("pending_state").apply()
+        _output.value = "已收到授权码，正在通过 OkHttp 交换 Access Token…"
         launchOperation(
             action = { OAuthRepository.exchange(code, OAuthSessionManager.secret.value) },
             updatesTokens = true
         )
+    }
+
+    private fun safeDebugOutput(json: JSONObject): String {
+        val safe = JSONObject(json.toString())
+        for (key in arrayOf("access_token", "refresh_token", "client_secret", "code")) {
+            if (safe.has(key)) safe.put(key, "[已安全处理；可在授权凭据中按需查看]")
+        }
+        return safe.toString(2)
     }
 
     private fun launchOperation(
@@ -92,7 +120,7 @@ class OAuthViewModel(private val app: Application) : AndroidViewModel(app) {
                     OAuthSessionManager.acceptTokenResponse(result)
                     RefreshScheduler.schedule(app)
                 }
-                _output.value = result.toString(2)
+                _output.value = safeDebugOutput(result)
             } catch (e: Exception) {
                 _output.value = "请求失败：" + (e.message ?: e.javaClass.simpleName)
             } finally {
@@ -112,7 +140,7 @@ class OAuthViewModel(private val app: Application) : AndroidViewModel(app) {
             try {
                 val token = OAuthSessionManager.ensureValidToken(forceRefresh = true)
                 _output.value = if (token != null && refreshState.value.kind == "REFRESHED") {
-                    session.value?.raw.orEmpty()
+                    safeDebugOutput(JSONObject(session.value?.raw.orEmpty().ifBlank { "{}" }))
                 } else {
                     "刷新未成功：${refreshState.value.message}"
                 }
