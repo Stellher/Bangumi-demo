@@ -170,6 +170,16 @@ private fun OAuthScreen(
             style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant
         )
+        OutlinedButton(
+            onClick = vm::inspectAuthorizationEntry,
+            enabled = !busy,
+            modifier = Modifier.fillMaxWidth()
+        ) { Text("用 OkHttp 检查授权入口 HTTP 跳转（无账号凭据）") }
+        Text(
+            "这只检测未登录请求的 HTTP 状态与重定向路径，不抓取系统浏览器的登录 Cookie、密码或验证码。",
+            style = MaterialTheme.typography.labelSmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant
+        )
         if (session != null) {
             val current = session!!
             HorizontalDivider()
