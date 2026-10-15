@@ -129,6 +129,10 @@ class OAuthViewModel(private val app: Application) : AndroidViewModel(app) {
         }
     }
 
+    fun inspectAuthorizationEntry() {
+        launchOperation({ OAuthRepository.probeAuthorizationEntry() })
+    }
+
     fun refresh() {
         if (_busy.value) return
         if (session.value == null) {
