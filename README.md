@@ -19,6 +19,10 @@ This is an **independent code snapshot**, initialized in this repository rather 
 
 ## OAuth setup
 
+**WebView-free login:** A native Compose button opens Bangumi's official authorization page with AndroidX Browser Custom Tabs (system browser), not an embedded WebView. The Bangumi code callback returns via `bgmoauthdemo://callback`. Token exchange, token status, refresh, and authorized API calls use OkHttp. The user never enters a Bangumi password into this app.
+
+Bangumi's published OAuth endpoints only support the interactive **Authorization Code** flow; a pure native username/password + OkHttp login is **not an official supported grant**. See [the detailed OAuth flow inspection](docs/OAUTH_NATIVE_FLOW.md) for the request sequence, optional safe HTTP entry probe, security limitations and rationale.
+
 Configure the registered redirect URI `bgmoauthdemo://callback` in the Bangumi developer console. The public client ID is part of the build; enter the Bangumi OAuth client secret **on the device**, never in this public repository. OAuth tokens are stored using Android Keystore encryption and refreshed when supported by the provider. An OAuth refresh token is not necessarily permanent and access may ultimately need reauthorization.
 
 ## App structure
