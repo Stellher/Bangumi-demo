@@ -1,6 +1,7 @@
 package com.example.bangumioauthdemo
 
 import android.content.Intent
+import android.net.Uri
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.BackHandler
@@ -23,6 +24,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.lifecycleScope
+import androidx.browser.customtabs.CustomTabsIntent
 import com.kyant.backdrop.backdrops.layerBackdrop
 import com.kyant.backdrop.backdrops.rememberLayerBackdrop
 import kotlinx.coroutines.launch
@@ -70,6 +72,7 @@ private fun BangumiHomeApp(
     // Separate capture layers prevent nested glass from sampling itself.
     val wallpaperBackdrop = rememberLayerBackdrop()
     val snackHost = remember { SnackbarHostState() }
+    val context = LocalContext.current
     val pageStateHolder = rememberSaveableStateHolder()
     var currentTab by rememberSaveable { mutableIntStateOf(0) }
     var searchOpen by rememberSaveable { mutableStateOf(false) }
@@ -302,6 +305,21 @@ private fun BangumiHomeApp(
                     } else {
                         // Subject details load before opening the editing form.
                         collectionEditorOpen = true
+                    }
+                }
+            )
+
+            EpisodeDiscussionSheet(
+                episode = vm.activeEpisode,
+                comments = vm.episodeComments,
+                onDismiss = vm::closeEpisodeDiscussion,
+                onRefresh = vm::refreshEpisodeDiscussion,
+                onOpenOfficial = { episodeId ->
+                    val address = Uri.parse("https://bgm.tv/ep/" + episodeId)
+                    runCatching {
+                        CustomTabsIntent.Builder().build().launchUrl(context, address)
+                    }.onFailure {
+                        vm.announce("无法打开 Bangumi 章节网页，请检查浏览器配置")
                     }
                 }
             )

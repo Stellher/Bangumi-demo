@@ -29,6 +29,7 @@ data class SubjectScreenData(
 
 class BangumiBrowseViewModel(app: Application) : AndroidViewModel(app) {
     private val repo = BangumiRepository()
+    private val episodeDiscussionApi = EpisodeDiscussionApi()
     val authorization = OAuthSessionManager.session
     val authState = OAuthSessionManager.refreshState
 
@@ -51,6 +52,10 @@ class BangumiBrowseViewModel(app: Application) : AndroidViewModel(app) {
     var subject by mutableStateOf(Resource<SubjectScreenData>())
         private set
     var person by mutableStateOf(Resource<JSONObject>())
+        private set
+    var activeEpisode by mutableStateOf<EpisodeCard?>(null)
+        private set
+    var episodeComments by mutableStateOf(Resource<List<EpisodeComment>>())
         private set
 
     var selectedSubject by mutableStateOf<Int?>(null)
@@ -198,6 +203,7 @@ class BangumiBrowseViewModel(app: Application) : AndroidViewModel(app) {
     }
 
     fun openSubject(id: Int) {
+        closeEpisodeDiscussion()
         selectedPerson = null
         selectedSubject = id
         loadSubject(id)
@@ -229,8 +235,39 @@ class BangumiBrowseViewModel(app: Application) : AndroidViewModel(app) {
     }
 
     fun closeSubject() {
+        closeEpisodeDiscussion()
         selectedSubject = null
         subject = Resource()
+    }
+
+    /** Read a chapter's public comments separately from its viewing progress. */
+    fun openEpisodeDiscussion(episode: EpisodeCard) {
+        if (episode.id <= 0) return
+        activeEpisode = episode
+        loadEpisodeComments(episode.id)
+    }
+
+    fun refreshEpisodeDiscussion() {
+        activeEpisode?.let { loadEpisodeComments(it.id) }
+    }
+
+    private fun loadEpisodeComments(episodeId: Int) {
+        episodeComments = Resource(loading = true)
+        viewModelScope.launch {
+            try {
+                val result = episodeDiscussionApi.comments(episodeId)
+                if (activeEpisode?.id == episodeId) episodeComments = Resource(data = result)
+            } catch (e: Exception) {
+                if (activeEpisode?.id == episodeId) {
+                    episodeComments = Resource(error = e.message ?: "读取章节吐槽失败")
+                }
+            }
+        }
+    }
+
+    fun closeEpisodeDiscussion() {
+        activeEpisode = null
+        episodeComments = Resource()
     }
 
     fun openPerson(id: Int, isCharacter: Boolean) {

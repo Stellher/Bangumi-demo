@@ -20,7 +20,7 @@ class BangumiRepository {
         .connectTimeout(15, TimeUnit.SECONDS)
         .readTimeout(30, TimeUnit.SECONDS)
         .build()
-    private val userAgent = "BangumiGlass/1.0 (Android; github.com/Stellher/demo-test)"
+    private val userAgent = "BangumiGlass/1.0 (Android; github.com/Stellher/Bangumi-demo)"
 
     private suspend fun request(
         path: String,
@@ -204,9 +204,31 @@ class BangumiRepository {
     }
 
     suspend fun detail(id: Int): JSONObject = objectResponse("/v0/subjects/" + id)
-    suspend fun episodes(id: Int): List<EpisodeCard> = objectResponse("/v0/episodes",
-        mapOf("subject_id" to id.toString(), "limit" to "100")
-    ).pageData().map(JSONObject::episode).filter { it.id > 0 }
+    /** Read every episode page; a single /v0/episodes request is capped at 100 items. */
+    suspend fun episodes(id: Int): List<EpisodeCard> {
+        require(id > 0) { "条目 ID 无效" }
+        val limit = 100
+        val found = LinkedHashMap<Int, EpisodeCard>()
+        var offset = 0
+        while (offset < 10000) {
+            val result = objectResponse("/v0/episodes", mapOf(
+                "subject_id" to id.toString(),
+                "limit" to limit.toString(),
+                "offset" to offset.toString()
+            ))
+            val page = result.pageData()
+            if (page.isEmpty()) break
+            val before = found.size
+            page.map(JSONObject::episode).filter { it.id > 0 }.forEach { found[it.id] = it }
+            offset += page.size
+            val total = result.optInt("total", -1)
+            if (page.size < limit || (total >= 0 && offset >= total)) break
+            // A server ignoring 'offset' must not trap the client in an endless loop.
+            if (found.size == before) error("Bangumi 章节分页未前进")
+        }
+        if (offset >= 10000) error("章节数量超出客户端安全上限")
+        return found.values.toList()
+    }
 
     suspend fun characters(id: Int): List<PersonCard> =
         JSONArray(request("/v0/subjects/" + id + "/characters"))
