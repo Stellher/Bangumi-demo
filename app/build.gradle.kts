@@ -47,5 +47,7 @@ dependencies {
     implementation("io.github.kyant0:backdrop:1.0.0")
     implementation("io.github.kyant0:capsule:2.1.1")
     testImplementation("junit:junit:4.13.2")
+    // Android unit tests need the actual org.json implementation, not android.jar stubs.
+    testImplementation("org.json:json:20240303")
     testImplementation("com.squareup.okhttp3:mockwebserver:4.12.0")
 }
