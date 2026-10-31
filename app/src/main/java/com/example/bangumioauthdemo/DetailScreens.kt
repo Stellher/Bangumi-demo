@@ -153,13 +153,16 @@ fun SubjectPage(
                 if (showAllEpisodes) "收起" else "查看全部") {
                 showAllEpisodes = !showAllEpisodes
             }
-            Text("点击章节右侧可更新观看进度；会真实写入 Bangumi 收藏状态。",
+            Text("点击章节可查看单集吐槽；点击右侧图标可标记已看。",
                 color = Slate, style = MaterialTheme.typography.bodySmall)
             Column(verticalArrangement = Arrangement.spacedBy(9.dp)) {
                 (if (showAllEpisodes) data.episodes else data.episodes.take(10)).forEach { ep ->
-                    EpisodeRow(ep, enabled = session != null && !vm.actionBusy) {
-                        vm.toggleEpisode(ep.id, true)
-                    }
+                    EpisodeRow(
+                        ep = ep,
+                        enabled = session != null && !vm.actionBusy,
+                        markSeen = { vm.toggleEpisode(ep.id, true) },
+                        onOpenDiscussion = { vm.openEpisodeDiscussion(ep) }
+                    )
                 }
             }
         }
@@ -191,9 +194,16 @@ private fun Metric(label: String, value: String, symbol: String) {
 }
 
 @Composable
-private fun EpisodeRow(ep: EpisodeCard, enabled: Boolean, markSeen: () -> Unit) {
+private fun EpisodeRow(
+    ep: EpisodeCard,
+    enabled: Boolean,
+    markSeen: () -> Unit,
+    onOpenDiscussion: () -> Unit
+) {
     Row(
-        Modifier.fillMaxWidth().background(Color.White.copy(alpha = .85f), RoundedCornerShape(15.dp))
+        Modifier.fillMaxWidth()
+            .background(Color.White.copy(alpha = .85f), RoundedCornerShape(15.dp))
+            .clickable(onClick = onOpenDiscussion)
             .padding(13.dp),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(10.dp)
