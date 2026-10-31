@@ -1,6 +1,6 @@
 # Bangumi Glass · Android Compose Client
 
-Independent Android project for [Bangumi](https://bgm.tv/), using Jetpack Compose, OAuth persistence/refresh, discovery, weekday calendar, anime-only seasonal browsing, search, subject/person details, collection editing, and a developer-facing catalog of 56 documented API operations.
+Independent Android project for [Bangumi](https://bgm.tv/), using Jetpack Compose, OAuth persistence/refresh, discovery, weekday calendar, anime-only seasonal browsing, search, subject/person details, collection editing, and a developer-facing catalog of 56 documented API operations, plus read-only episode discussion browsing.
 
 ## UX and upstream attribution
 
@@ -24,6 +24,13 @@ This is an **independent code snapshot**, initialized in this repository rather 
 Bangumi's published OAuth endpoints only support the interactive **Authorization Code** flow; a pure native username/password + OkHttp login is **not an official supported grant**. See [the detailed OAuth flow inspection](docs/OAUTH_NATIVE_FLOW.md) for the request sequence, optional safe HTTP entry probe, security limitations and rationale.
 
 Configure the registered redirect URI `bgmoauthdemo://callback` in the Bangumi developer console. The public client ID is part of the build; enter the Bangumi OAuth client secret **on the device**, never in this public repository. OAuth tokens are stored using Android Keystore encryption and refreshed when supported by the provider. An OAuth refresh token is not necessarily permanent and access may ultimately need reauthorization.
+
+## Episode discussion (read + official posting)
+
+- The subject detail page now lists **all pages** of chapters from the public \`GET /v0/episodes\` API. Tap any chapter row to read its **episode-specific**, not whole-subject, public discussions from \`GET https://next.bgm.tv/p1/episodes/{episodeID}/comments\`.
+- The discussion bottom sheet uses the existing Kyant-backed Liquid Glass components, shows direct replies and author information, and lets the user refresh. No OAuth token or cookie is sent when reading public comments.
+- **Posting is not falsely presented as a supported OAuth-only call.** Bangumi's private \`POST /p1/episodes/{episodeID}/comments\` additionally requires a valid Cloudflare Turnstile token produced by an actual user challenge. The sheet opens \`https://bgm.tv/ep/{episodeID}\` in Android Custom Tabs, where the user can log in and post normally.
+- Viewing progress and a subject-level collection short review remain separate operations and are unchanged.
 
 ## App structure
 
